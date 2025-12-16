@@ -1,10 +1,12 @@
 import express from "express";
-
 const app = express();
 
-app.get("/auth/callback", (req, res) => {
-  const code = req.query.code;
-  res.send(`Callback funcionando! Code recibido: ${code}`);
+app.get("/", (req, res) => {
+  res.send("Backend funcionando OK");
 });
 
-app.listen(3000, () => console.log("Servidor corriendo en puerto 3000"));
+app.get("/callback", (req, res) => {
+  res.send("Callback OK");
+});
+
+export default app;
