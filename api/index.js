@@ -3,7 +3,7 @@ import express from "express"
 const app = express();
 
 // Endpoint raíz
-app.get("/", (req, res) => {
+app.get("/callback", (req, res) => {
   res.send("Backend funcionando OK");
 });
 
