@@ -1,48 +1,87 @@
-import express from "express"
+import express from "express";
 
 const app = express();
+app.use(express.json());
 
-// Endpoint raíz
-app.get("/callback", (req, res) => {
-  res.send("Backend funcionando OK");
+// Guardamos el token en memoria (por ahora)
+let accessToken = null;
+
+/* =========================
+   CALLBACK OAUTH ML
+========================= */
+app.get("/callback", async (req, res) => {
+  const { code } = req.query;
+
+  if (!code) {
+    return res.status(400).send("No se recibió el code");
+  }
+
+  try {
+    const response = await fetch("https://api.mercadolibre.com/oauth/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        grant_type: "authorization_code",
+        client_id: process.env.CLIENT_ID,
+        client_secret: process.env.CLIENT_SECRET,
+        code,
+        redirect_uri: "https://mario-ml-aapi.vercel.app/callback"
+      })
+    });
+
+    const data = await response.json();
+
+    accessToken = data.access_token;
+
+    console.log("ACCESS TOKEN ML:", accessToken);
+
+    res.json({
+      mensaje: "Token obtenido correctamente",
+      user_id: data.user_id,
+      expires_in: data.expires_in
+    });
+
+  } catch (error) {
+    console.error("Error OAuth ML:", error);
+    res.status(500).send("Error obteniendo token");
+  }
 });
 
-// Endpoint para obtener perfumes con paginación y filtros
+/* =========================
+   PERFUMES (PÚBLICO)
+========================= */
 app.get("/perfumes", async (req, res) => {
   try {
-    // Parámetros de query
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const brand = req.query.brand; // opcional
-    const category = req.query.category; // opcional
+    const brand = req.query.brand;
+    const category = req.query.category;
     const offset = (page - 1) * limit;
 
-    // Construimos la query de búsqueda
-    let query = "perfumes"; // palabra clave por defecto
+    let query = "perfumes";
     if (brand) query += ` ${brand}`;
     if (category) query += ` ${category}`;
 
-    // Fetch a Mercado Libre
     const response = await fetch(
       `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`
     );
 
     const data = await response.json();
 
-    // Filtramos los campos que necesitamos
     const perfumes = data.results.map(item => {
       const eanAttribute = item.attributes.find(attr => attr.id === "EAN");
       return {
         title: item.title,
         thumbnail: item.thumbnail,
-        pictures: item.pictures.map(p => p.url),
+        pictures: item.pictures?.map(p => p.url) || [],
         ean: eanAttribute ? eanAttribute.value_name : null,
         brand: item.attributes.find(attr => attr.id === "BRAND")?.value_name || null,
         category: item.category_id || null
       };
     });
 
-    // Devolvemos perfumes + info de paginación
     res.json({
       page,
       limit,
@@ -56,6 +95,10 @@ app.get("/perfumes", async (req, res) => {
   }
 });
 
-// Puerto
+/* =========================
+   SERVER
+========================= */
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en puerto ${PORT}`);
+});
