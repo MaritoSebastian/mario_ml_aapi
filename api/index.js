@@ -34,6 +34,7 @@ app.get("/callback", async (req, res) => {
     });
 
     const data = await response.json();
+    res.json(data)
 
     accessToken = data.access_token;
 
