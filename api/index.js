@@ -2,60 +2,35 @@ import express from "express";
 
 const app = express();
 
-let accessToken = null;
 
 /* =========================
    CALLBACK OAUTH ML
 ========================= */
-app.get("/callback", async (req, res) => {
-  const { code } = req.query;
+async function getAccessToken() {
+  const response = await fetch("https://api.mercadolibre.com/oauth/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: process.env.ML_CLIENT_ID,
+      client_secret: process.env.ML_CLIENT_SECRET
+    })
+  });
 
-  if (!code) {
-    return res.status(400).send("No se recibió el code");
-  }
-
-  try {
-    const response = await fetch("https://api.mercadolibre.com/oauth/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        client_id: process.env.ML_CLIENT_ID,
-        client_secret: process.env.ML_CLIENT_SECRET,
-        code,
-        redirect_uri: "https://mario-ml-aapi.vercel.app/callback"
-      })
-    });
-
-    const data = await response.json();
-    accessToken = data.access_token;
-
-    res.json({
-      mensaje: "Token obtenido correctamente",
-      expires_in: data.expires_in
-    });
-
-  } catch (error) {
-    console.error("Error OAuth ML:", error);
-    res.status(500).send("Error obteniendo token");
-  }
-});
+  const data = await response.json();
+  return data.access_token;
+}
 
 /* =========================
    PERFUMES (CATÁLOGO)
 ========================= */
 app.get("/perfumes", async (req, res) => {
 
-  if(!accessToken)    {
 
-  return res.status(401).json({
-      error: "No hay access token. Primero autenticarse en /callback"
-    });
-
-  }
   try {
+     const accessToken=await getAccessToken();
     const response = await fetch(
       "https://api.mercadolibre.com/sites/MLA/search?q=perfumes&limit=20",{
         headers:{
