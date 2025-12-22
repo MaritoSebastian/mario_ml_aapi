@@ -47,9 +47,21 @@ app.get("/callback", async (req, res) => {
    PERFUMES (CATÁLOGO)
 ========================= */
 app.get("/perfumes", async (req, res) => {
+
+  if(!accessToken)    {
+
+  return res.status(401).json({
+      error: "No hay access token. Primero autenticarse en /callback"
+    });
+
+  }
   try {
     const response = await fetch(
-      "https://api.mercadolibre.com/sites/MLA/search?q=perfumes&limit=20"
+      "https://api.mercadolibre.com/sites/MLA/search?q=perfumes&limit=20",{
+        headers:{
+           Authorization: `Bearer ${accessToken}`
+        }
+      }
     );
 
     const data = await response.json();
@@ -60,7 +72,10 @@ app.get("/perfumes", async (req, res) => {
       thumbnail: item.thumbnail
     }));
 
-    res.json(perfumes);
+    res.json({
+      total:perfumes.length,
+      results:perfumes
+    });
 
   } catch (error) {
     console.error("Error obteniendo perfumes:", error);
