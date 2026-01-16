@@ -281,12 +281,17 @@ app.get("/status", (req, res) => {
 /* =========================
    AUTH URL
 ========================= */
+/* =========================
+   AUTH URL CON PROMPT=CONSENT
+========================= */
 app.get("/auth-url", (req, res) => {
-  const authUrl = `https://auth.mercadolibre.com.ar/authorization?response_type=code&client_id=${process.env.ML_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.ML_REDIRECT_URI)}`;
+  // Agrega &prompt=consent para forzar nuevo refresh_token
+  const authUrl = `https://auth.mercadolibre.com.ar/authorization?response_type=code&client_id=${process.env.ML_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.ML_REDIRECT_URI)}&prompt=consent`;
   
   res.json({
     success: true,
-    auth_url: authUrl
+    auth_url: authUrl,
+    note: "Usa esta URL para obtener refresh_token"
   });
 });
 
