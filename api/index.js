@@ -276,7 +276,111 @@ app.get("/reset-token", (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
-
+// ========== 6. DIAGNÓSTICO TOKEN ==========
+app.get("/diagnostico", async (req, res) => {
+  if (!token) {
+    return res.json({ 
+      error: "NO_TOKEN", 
+      message: "Primero obtén un token en la página principal" 
+    });
+  }
+  
+  try {
+    console.log("🔍 Diagnosticando token...");
+    
+    // 1. Verificar información del usuario (permiso básico)
+    const userResponse = await fetch("https://api.mercadolibre.com/users/me", {
+      headers: { 
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/json"
+      }
+    });
+    
+    const userData = userResponse.ok ? await userResponse.json() : null;
+    
+    // 2. Probar búsqueda de productos (necesita permiso 'read')
+    const searchResponse = await fetch(
+      "https://api.mercadolibre.com/sites/MLA/search?q=test&limit=1",
+      { 
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/json"
+        }
+      }
+    );
+    
+    // 3. Probar categorías (otro endpoint que necesita permisos)
+    const categoriesResponse = await fetch(
+      "https://api.mercadolibre.com/sites/MLA/categories",
+      { 
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/json"
+        }
+      }
+    );
+    
+    res.json({
+      // Información del token
+      token_tipo: token.startsWith("APP_USR-") ? "APP_USR (Usuario App)" : 
+                  token.startsWith("TG-") ? "TG (Test)" : "Desconocido",
+      token_preview: token.substring(0, 40) + "...",
+      token_length: token.length,
+      
+      // Resultados de pruebas
+      prueba_1_usuario: {
+        endpoint: "/users/me",
+        status: userResponse.status,
+        ok: userResponse.ok,
+        tiene_permiso: userResponse.ok,
+        user_id: userData?.id,
+        nickname: userData?.nickname
+      },
+      
+      prueba_2_busqueda: {
+        endpoint: "/sites/MLA/search",
+        status: searchResponse.status,
+        ok: searchResponse.ok,
+        tiene_permiso_read: searchResponse.ok,
+        es_error_403: searchResponse.status === 403,
+        mensaje: searchResponse.status === 403 ? 
+          "❌ FALTA permiso 'read' para buscar productos" : 
+          "✅ TIENE permiso 'read'"
+      },
+      
+      prueba_3_categorias: {
+        endpoint: "/sites/MLA/categories",
+        status: categoriesResponse.status,
+        ok: categoriesResponse.ok,
+        tiene_permiso: categoriesResponse.ok
+      },
+      
+      // Análisis
+      analisis: searchResponse.status === 403 ? 
+        "EL PROBLEMA ES: Token sin permiso 'read'. Necesitas reautorizar CON scope." :
+        "Token funciona correctamente para todas las operaciones",
+      
+      // Soluciones
+      soluciones: [
+        "1. Ve a /reset-token para eliminar este token",
+        "2. Vuelve a la página principal /",
+        "3. Usa el botón 'Autorizar en ML (CON PERMISOS)'",
+        "4. VERIFICA que ML muestre permisos de LECTURA",
+        "5. Vuelve a autorizar"
+      ],
+      
+      // Enlace directo con scope
+      url_autorizacion_correcta: "https://auth.mercadolibre.com.ar/authorization?response_type=code&client_id=4202688803860967&redirect_uri=https%3A%2F%2Fmario-ml-aapi.vercel.app%2Fcallback&prompt=consent&scope=read"
+    });
+    
+  } catch (error) {
+    res.json({ 
+      error: "ERROR_DIAGNOSTICO", 
+      message: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined
+    });
+  }
+});
 
 
 // ========== INICIAR ==========
