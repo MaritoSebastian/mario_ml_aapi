@@ -9,6 +9,7 @@ app.use(express.json());
 let token = null;
 
 // ========== 1. PÁGINA INICIAL ==========
+// ========== 1. PÁGINA INICIAL ==========
 app.get("/", (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -18,7 +19,9 @@ app.get("/", (req, res) => {
       <style>
         body { font-family: Arial; padding: 40px; }
         .card { background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0; }
-        .btn { background: #00a650; color: white; padding: 12px 24px; text-decoration: none; display: inline-block; }
+        .btn { background: #00a650; color: white; padding: 12px 24px; text-decoration: none; display: inline-block; margin: 5px; }
+        .btn-reset { background: #dc3545; }
+        .btn-diagnostico { background: #6f42c1; }
       </style>
     </head>
     <body>
@@ -26,11 +29,18 @@ app.get("/", (req, res) => {
       <p><strong>Estado:</strong> ${token ? "✅ Token listo" : "❌ Necesita token"}</p>
       
       <div class="card">
-        <h3>1. Obtener Token</h3>
-        <a href="https://auth.mercadolibre.com.ar/authorization?response_type=code&client_id=4202688803860967&redirect_uri=https://mario-ml-aapi.vercel.app/callback&prompt=consent&scope=offline_access%20read%20write" 
-           🔓 Autorizar en ML
+        <h3>1. Obtener Token CON PERMISOS</h3>
+        <a href="https://auth.mercadolibre.com.ar/authorization?response_type=code&client_id=4202688803860967&redirect_uri=https://mario-ml-aapi.vercel.app/callback&prompt=consent&scope=read" 
+           class="btn">
+           🔓 Autorizar en ML (CON PERMISO DE LECTURA)
         </a>
         <p>Después de autorizar, ML te redirigirá a /callback</p>
+        
+        <div style="margin-top: 10px;">
+          <a href="/reset-token" class="btn btn-reset">🗑️ Reset Token</a>
+          <a href="/diagnostico" class="btn btn-diagnostico">🔍 Diagnóstico</a>
+          <a href="/public?q=celulares" class="btn" style="background: #20c997;">🌐 Ver productos públicos</a>
+        </div>
       </div>
       
       <div class="card">
@@ -46,6 +56,9 @@ app.get("/", (req, res) => {
           <li><code>GET /productos</code> - Lista de productos (JSON)</li>
           <li><code>GET /productos?q=perfumes&limit=10</code> - Con parámetros</li>
           <li><code>GET /producto/:id</code> - Detalle de producto</li>
+          <li><code>GET /reset-token</code> - Limpiar token actual</li>
+          <li><code>GET /diagnostico</code> - Diagnóstico del token</li>
+          <li><code>GET /public?q=zapatos</code> - Productos públicos (sin token)</li>
         </ul>
       </div>
     </body>
@@ -381,7 +394,38 @@ app.get("/diagnostico", async (req, res) => {
     });
   }
 });
-
+// ========== 8. PRODUCTOS PÚBLICOS ==========
+app.get("/public", async (req, res) => {
+  const query = req.query.q || "celulares";
+  const limit = Math.min(parseInt(req.query.limit) || 5, 20);
+  
+  try {
+    const response = await fetch(
+      `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=${limit}`
+    );
+    
+    const data = await response.json();
+    
+    res.json({
+      success: true,
+      message: "✅ API PÚBLICA - No necesita token",
+      query: query,
+      limit: limit,
+      total: data.paging?.total || 0,
+      productos: data.results?.map(item => ({
+        id: item.id,
+        title: item.title.substring(0, 50) + "...",
+        price: item.price,
+        currency: item.currency_id,
+        thumbnail: item.thumbnail,
+        condition: item.condition
+      })) || []
+    });
+    
+  } catch (error) {
+    res.json({ error: error.message });
+  }
+});
 
 // ========== INICIAR ==========
 const PORT = process.env.PORT || 3000;
