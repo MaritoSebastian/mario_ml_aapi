@@ -57,7 +57,7 @@ async function initializeMeliAuth() {
 }
 
 // Ejecutar al inicio
-initializeMeliAuth();
+//initializeMeliAuth();
 /* =========================
    ENDPOINT PARA GUARDAR TOKEN MANUALMENTE
 ========================= */
@@ -594,7 +594,7 @@ app.get("/test-perfumes", async (req, res) => {
 // ========== MANTÉN TU app.listen EXISTENTE ==========
 app.listen(3000, () =>  {
   console.log("Server running on port 3000");
-  initializeMeliAuth();
+  //initializeMeliAuth();
 });
 
 export default app;
