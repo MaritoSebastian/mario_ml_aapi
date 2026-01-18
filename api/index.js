@@ -132,42 +132,19 @@ app.get("/callback", async (req, res) => {
 
 // ========== 3. ENDPOINT PRODUCTOS (PARA FRONTEND) ==========
 app.get("/productos", async (req, res) => {
-  // Si no hay token
-  if (!token) {
-    return res.json({ 
-      error: "NO_TOKEN",
-      message: "Primero obtén un token autorizando la app",
-      auth_url: "https://auth.mercadolibre.com.ar/authorization?response_type=code&client_id=4202688803860967&redirect_uri=https://mario-ml-aapi.vercel.app/callback&prompt=consent"
-    });
-  }
-  
   // Parámetros
   const query = req.query.q || "perfumes";
   const limit = req.query.limit || 12;
   const offset = req.query.offset || 0;
   
-  console.log("🛍️ Solicitando productos:", { query, limit, offset });
+  console.log("🛍️ Solicitando productos (API PÚBLICA):", { query, limit, offset });
   
   try {
+    // ⚡ ¡SOLUCIÓN: QUITAR EL TOKEN! Usar API PÚBLICA
     const response = await fetch(
-      `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Accept": "application/json"
-        }
-      }
+      `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`
+      // SIN headers de Authorization
     );
-    
-    // Si el token expiró
-    if (response.status === 401) {
-      token = null;
-      return res.json({ 
-        error: "TOKEN_EXPIRED",
-        message: "El token expiró. Vuelve a autorizar la app",
-        auth_url: "https://auth.mercadolibre.com.ar/authorization?response_type=code&client_id=4202688803860967&redirect_uri=https://mario-ml-aapi.vercel.app/callback&prompt=consent"
-      });
-    }
     
     if (!response.ok) {
       throw new Error(`API ML error: ${response.status}`);
@@ -178,6 +155,7 @@ app.get("/productos", async (req, res) => {
     // Formatear respuesta para frontend
     res.json({
       success: true,
+      source: "API PÚBLICA de MercadoLibre",
       query: query,
       pagination: {
         total: data.paging?.total || 0,
@@ -205,21 +183,12 @@ app.get("/productos", async (req, res) => {
     });
   }
 });
-
 // ========== 4. DETALLE DE PRODUCTO ==========
 app.get("/producto/:id", async (req, res) => {
-  if (!token) {
-    return res.json({ error: "NO_TOKEN" });
-  }
-  
   try {
     const [itemRes, descRes] = await Promise.all([
-      fetch(`https://api.mercadolibre.com/items/${req.params.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      }),
-      fetch(`https://api.mercadolibre.com/items/${req.params.id}/description`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      fetch(`https://api.mercadolibre.com/items/${req.params.id}`),
+      fetch(`https://api.mercadolibre.com/items/${req.params.id}/description`)
     ]);
     
     const item = await itemRes.json();
@@ -243,8 +212,6 @@ app.get("/producto/:id", async (req, res) => {
     res.json({ success: false, error: error.message });
   }
 });
-
-// ========== 5. STATUS ==========
 // ========== 5. STATUS ==========
 app.get("/status", (req, res) => {
   res.json({
@@ -443,5 +410,4 @@ app.listen(PORT, () => {
 });
 
 export default app;
-  
   
