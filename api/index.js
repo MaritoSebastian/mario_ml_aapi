@@ -27,8 +27,7 @@ app.get("/", (req, res) => {
       
       <div class="card">
         <h3>1. Obtener Token</h3>
-        <a href="https://auth.mercadolibre.com.ar/authorization?response_type=code&client_id=4202688803860967&redirect_uri=https://mario-ml-aapi.vercel.app/callback&prompt=consent" 
-           target="_blank" class="btn">
+        <a href="https://auth.mercadolibre.com.ar/authorization?response_type=code&client_id=4202688803860967&redirect_uri=https://mario-ml-aapi.vercel.app/callback&prompt=consent&scope=offline_access%20read%20write" 
            🔓 Autorizar en ML
         </a>
         <p>Después de autorizar, ML te redirigirá a /callback</p>
@@ -233,6 +232,7 @@ app.get("/producto/:id", async (req, res) => {
 });
 
 // ========== 5. STATUS ==========
+// ========== 5. STATUS ==========
 app.get("/status", (req, res) => {
   res.json({
     backend: "MercadoLibre API",
@@ -249,6 +249,35 @@ app.get("/status", (req, res) => {
     }
   });
 });
+
+// ========== 🆕 6. RESET TOKEN ==========
+app.get("/reset-token", (req, res) => {
+  const hadToken = token !== null;
+  const oldTokenPreview = token ? token.substring(0, 10) + "..." : "none";
+  
+  // ¡ESTA ES LA LÍNEA QUE BORRA EL TOKEN!
+  token = null;
+  
+  res.json({
+    success: true,
+    message: hadToken ? "✅ Token eliminado correctamente" : "ℹ️ No había token para eliminar",
+    details: {
+      had_token: hadToken,
+      old_token_preview: oldTokenPreview,
+      new_token_state: "null (eliminado)"
+    },
+    next_steps: [
+      "1. Ve a la página principal: /",
+      "2. Haz click en 'Autorizar en ML (CON PERMISOS)'",
+      "3. ML te pedirá permisos (debes ver READ y WRITE)",
+      "4. Serás redirigido a /callback automáticamente",
+      "5. El nuevo token se guardará automáticamente"
+    ],
+    timestamp: new Date().toISOString()
+  });
+});
+
+
 
 // ========== INICIAR ==========
 const PORT = process.env.PORT || 3000;
