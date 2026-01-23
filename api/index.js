@@ -1,5 +1,5 @@
 // index.js - BACKEND COMPLETO TIENDA ML
-import express from 'express';
+/*import express from 'express';
 import cors from 'cors';
 import { MongoClient, ObjectId } from 'mongodb';
 
@@ -804,4 +804,23 @@ app.listen(PORT, () => {
 });
 
 // Export para Vercel
+export default app;*/// index.js
+import express from 'express';
+import cors from 'cors';
+import routes from './routes.js';
+import { connectDB } from './db.js';
+
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+await connectDB();
+
+app.use('/', routes);
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
 export default app;
