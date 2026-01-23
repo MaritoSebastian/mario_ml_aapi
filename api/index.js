@@ -3,7 +3,6 @@ import express from 'express';
 import cors from 'cors';
 import { MongoClient, ObjectId } from 'mongodb';
 
-dotenv.config();
 const app = express();
 
 // Middleware
