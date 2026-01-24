@@ -807,7 +807,6 @@ app.listen(PORT, () => {
 export default app;*/// index.js
 import express from 'express';
 import cors from 'cors';
-import fetch from 'node-fetch';
 import { MongoClient } from 'mongodb';
 
 const app = express();
