@@ -807,20 +807,62 @@ app.listen(PORT, () => {
 export default app;*/// index.js
 import express from 'express';
 import cors from 'cors';
-import routes from './routes.js';
+import fetch from 'node-fetch';
+import { MongoClient } from 'mongodb';
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
-app.use('/', routes);
 
+let client;
+let db;
+
+async function getDB() {
+  if (db) return db;
+
+  client = new MongoClient(process.env.MONGODB_URI);
+  await client.connect();
+  db = client.db();
+  return db;
+}
+
+/* ===== HEALTH ===== */
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-export default function handler(req, res) {
-  return app(req, res);
-}
+/* ===== ML STATUS ===== */
+app.get('/api/ml/status', async (req, res) => {
+  const db = await getDB();
+  const token = await db.collection('tokens_ml').findOne({});
+  res.json({
+    conectado: !!token,
+    usuario: token?.nickname || null,
+  });
+});
+
+/* ===== PUBLICAR ===== */
+app.post('/api/ml/item', async (req, res) => {
+  const db = await getDB();
+  const token = await db.collection('tokens_ml').findOne({});
+
+  if (!token) {
+    return res.status(401).json({ error: 'NO_CONECTADO_ML' });
+  }
+
+  const mlRes = await fetch('https://api.mercadolibre.com/items', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token.access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(req.body),
+  });
+
+  const data = await mlRes.json();
+  res.status(mlRes.status).json(data);
+});
+
+export default app;
 
 
