@@ -1,4 +1,3 @@
-// db.js
 import { MongoClient } from 'mongodb';
 
 let client;
@@ -7,25 +6,22 @@ let db;
 export async function connectDB() {
   if (db) return db;
 
-  try {
-    client = new MongoClient(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-    });
+  client = new MongoClient(process.env.MONGODB_URI, {
+    serverSelectionTimeoutMS: 5000,
+  });
 
-    await client.connect();
-    db = client.db(); // usa la DB definida en la URI
+  await client.connect();
+  db = client.db();
 
-    console.log('✅ MongoDB conectado');
-    return db;
-  } catch (error) {
-    console.error('❌ Error MongoDB:', error.message);
-    throw error;
-  }
+  console.log('✅ MongoDB conectado');
+  return db;
 }
 
-export function getDB() {
+export async function getDB() {
   if (!db) {
-    throw new Error('DB no inicializada');
+    await connectDB();
   }
   return db;
 }
+
+
