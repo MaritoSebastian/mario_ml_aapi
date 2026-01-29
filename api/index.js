@@ -839,6 +839,33 @@ app.get('/api/ml/status', async (req, res) => {
     usuario: token?.nickname || null,
   });
 });
+/* =====GUARDAR  ===== */
+app.post('/api/products', async (req, res) => {
+  const db = await getDB();
+
+  const product = {
+    title: req.body.title,
+    price: req.body.price,
+    stock: req.body.stock,
+    category: req.body.category,
+    images: req.body.images,
+    description: req.body.description,
+    ml: {
+      published: false,
+      item_id: null
+    },
+    createdAt: new Date()
+  };
+
+  const result = await db.collection('products').insertOne(product);
+
+  res.json({
+    ok: true,
+    message: 'Producto guardado',
+    productId: result.insertedId
+  });
+});
+
 
 /* ===== PUBLICAR ===== */
 app.post('/api/ml/item', async (req, res) => {
