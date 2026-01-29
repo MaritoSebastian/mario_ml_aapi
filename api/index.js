@@ -839,31 +839,45 @@ app.get('/api/ml/status', async (req, res) => {
     usuario: token?.nickname || null,
   });
 });
+
+
+
+
 /* =====GUARDAR  ===== */
 app.post('/api/products', async (req, res) => {
-  const db = await getDB();
+  try {
+    console.log('BODY RECIBIDO:', req.body);
 
-  const product = {
-    title: req.body.title,
-    price: req.body.price,
-    stock: req.body.stock,
-    category: req.body.category,
-    images: req.body.images,
-    description: req.body.description,
-    ml: {
-      published: false,
-      item_id: null
-    },
-    createdAt: new Date()
-  };
+    const db = await getDB();
 
-  const result = await db.collection('products').insertOne(product);
+    const product = {
+      title: req.body.title,
+      price: Number(req.body.price),
+      stock: Number(req.body.stock),
+      category: req.body.category,
+      images: req.body.images,
+      description: req.body.description,
+      ml: {
+        published: false,
+        item_id: null
+      },
+      createdAt: new Date()
+    };
 
-  res.json({
-    ok: true,
-    message: 'Producto guardado',
-    productId: result.insertedId
-  });
+    const result = await db.collection('products').insertOne(product);
+
+    res.json({
+      ok: true,
+      message: 'Producto guardado',
+      productId: result.insertedId
+    });
+  } catch (error) {
+    console.error('ERROR PRODUCTS:', error);
+    res.status(500).json({
+      ok: false,
+      error: error.message
+    });
+  }
 });
 
 
