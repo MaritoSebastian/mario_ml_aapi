@@ -840,6 +840,39 @@ app.get('/api/ml/status', async (req, res) => {
   });
 });
 
+/* ===== TEST DB PRODUCT ===== */
+app.get('/api/test/product', async (req, res) => {
+  try {
+    const db = await getDB();
+
+    const product = {
+      title: 'Producto Test Backend',
+      price: 12345,
+      stock: 7,
+      category: 'MLA3530',
+      images: [
+        'https://http2.mlstatic.com/D_NQ_NP_123456-MLA.jpg'
+      ],
+      description: 'Producto creado directamente desde el backend',
+      ml: {
+        published: false,
+        item_id: null
+      },
+      createdAt: new Date()
+    };
+
+    const result = await db.collection('products').insertOne(product);
+
+    res.json({
+      ok: true,
+      message: 'Producto creado desde backend',
+      id: result.insertedId
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
 
 
 
