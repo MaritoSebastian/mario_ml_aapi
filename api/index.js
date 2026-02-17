@@ -3,10 +3,43 @@ import express from "express";
 import cors from "cors";
 import { MongoClient } from "mongodb";
 import { ObjectId } from "mongodb";
-
+import { v2 as cloudinary } from "cloudinary";
+import multer from "multer";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+cloudinary.config({
+  secure: true,
+});
 const app = express();
 app.use(cors());
 app.use(express.json());
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "productos",
+    allowed_formats: ["jpg", "png", "jpeg", "webp"],
+  },
+});
+
+
+
+const upload = multer({ storage });
+
+app.post("/api/upload", upload.single("image"), (req, res) => {
+  try {
+    res.json({
+      ok: true,
+      imageUrl: req.file.path,
+    });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error.message,
+    });
+  }
+});
+
+
+
 
 let client;
 let db;
