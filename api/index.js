@@ -13,6 +13,8 @@ cloudinary.config({
 const app = express();
 app.use(cors());
 app.use(express.json());
+console.log("CLOUDINARY_URL:", process.env.CLOUDINARY_URL);
+
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
