@@ -227,6 +227,14 @@ app.delete("/api/products/:id", async (req, res) => {
       error: error.message,
     });
   }
+  
+
 });
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 
 export default app;
