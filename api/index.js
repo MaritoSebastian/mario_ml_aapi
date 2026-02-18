@@ -7,6 +7,7 @@ import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 cloudinary.config({
+   url:process.env.CLOUDINARY_URL,
   secure: true,
 });
 const app = express();
