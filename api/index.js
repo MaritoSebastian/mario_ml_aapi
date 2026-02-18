@@ -26,20 +26,33 @@ const storage = new CloudinaryStorage({
 
 
 const upload = multer({ storage });
+app.post("/api/upload", (req, res) => {
+  upload.single("image")(req, res, function (err) {
+    if (err) {
+      console.error("UPLOAD ERROR:", err);
+      return res.status(500).json({
+        ok: false,
+        error: err.message,
+      });
+    }
 
-app.post("/api/upload", upload.single("image"), (req, res) => {
-  try {
+    if (!req.file) {
+      return res.status(400).json({
+        ok: false,
+        error: "NO_FILE_RECEIVED",
+      });
+    }
+
+    console.log("FILE OK:", req.file.path);
+
     res.json({
       ok: true,
       imageUrl: req.file.path,
     });
-  } catch (error) {
-    res.status(500).json({
-      ok: false,
-      error: error.message,
-    });
-  }
+  });
 });
+
+
 
 
 
