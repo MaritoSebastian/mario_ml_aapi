@@ -1,4 +1,3 @@
-
 import express from "express";
 import cors from "cors";
 import { MongoClient } from "mongodb";
@@ -25,8 +24,6 @@ const storage = new CloudinaryStorage({
   },
 });
 
-
-
 const upload = multer({ storage });
 app.post("/api/upload", (req, res) => {
   upload.single("image")(req, res, function (err) {
@@ -46,18 +43,17 @@ app.post("/api/upload", (req, res) => {
     }
 
     console.log("FILE OK:", req.file.path);
+    const optimizedUrl = req.file.path.replace(
+      "/upload/",
+      "/upload/f_auto,q_auto,w_800/",
+    );
 
     res.json({
       ok: true,
-      imageUrl: req.file.path,
+      imageUrl: optimizedUrl,
     });
   });
 });
-
-
-
-
-
 
 let client;
 let db;
@@ -91,10 +87,30 @@ app.post("/api/products", async (req, res) => {
   try {
     const { title, price, stock, category, images, description } = req.body;
 
-    if (!title || !price) {
+    if (
+      !title ||
+      price === undefined ||
+      stock === undefined ||
+      !category ||
+      !description ||
+      !Array.isArray(images) ||
+      images.length === 0
+    ) {
       return res.status(400).json({
         ok: false,
         error: "BODY_VACIO_O_INVALIDO",
+      });
+    }
+    if (isNaN(stock) || Number(stock)<0) {
+      return res.status(400).json({
+        ok: false,
+        error: "STOCK_INVALIDO",
+      });
+    }
+    if (isNaN(price) || Number(price) <= 0) {
+      return res.status(400).json({
+        ok: false,
+        error: "PRICE_INVALIDO",
       });
     }
 
@@ -103,7 +119,7 @@ app.post("/api/products", async (req, res) => {
     const product = {
       title,
       price: Number(price),
-      stock: Number(stock || 0),
+      stock: Number(stock),
       category,
       images: images || [],
       description,
@@ -242,14 +258,11 @@ app.delete("/api/products/:id", async (req, res) => {
       error: error.message,
     });
   }
-  
-
 });
 export const config = {
   api: {
     bodyParser: false,
   },
 };
-
 
 export default app;
