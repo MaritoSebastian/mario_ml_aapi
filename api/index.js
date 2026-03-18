@@ -18,7 +18,7 @@ app.use(express.json());
 console.log("CLOUDINARY_URL:", process.env.CLOUDINARY_URL);
 
 mercadopago.configure({
-  access_token: process.env.MP_ACCESS_TOKEN,
+  access_token:process.env.MP_ACCESS_TOKEN
 });
 
 const storage = new CloudinaryStorage({
