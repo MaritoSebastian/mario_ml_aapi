@@ -5,6 +5,7 @@ import { ObjectId } from "mongodb";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
+import mercadopago from "mercadopago"
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME,
   api_key: process.env.CLOUD_API_KEY,
@@ -15,6 +16,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 console.log("CLOUDINARY_URL:", process.env.CLOUDINARY_URL);
+
+mercadopago.configure({
+  access_token: process.env.MP_ACCESS_TOKEN,
+});
 
 const storage = new CloudinaryStorage({
   cloudinary,
@@ -257,6 +262,48 @@ app.delete("/api/products/:id", async (req, res) => {
       ok: false,
       error: error.message,
     });
+  }
+});
+//ENDPOINDDEMERCADOPAGO//
+app.post("/create-preference", async (req, res) => {
+  try {
+    const { items } = req.body;
+    const db=await getDB();
+    const order={
+       items,
+  total: items.reduce((acc, item) => acc + item.price * item.quantity, 0),
+  status: "pending",
+  createdAt: new Date(),
+
+
+    };
+    const result = await db.collection("orders").insertOne(order);
+
+    const preference = {
+      items: items.map((item) => ({
+       
+        title: item.title,
+        unit_price: item.price,
+        quantity: item.quantity,
+          currency_id: "ARS",
+      })),
+       external_reference: result.insertedId.toString(),
+      back_urls: {
+        success: "http://localhost:5173/success",
+        failure: "http://localhost:5173/error",
+         pending: "http://localhost:5173/pending",
+      },
+      auto_return: "approved",
+    };
+
+    const response = await mercadopago.preferences.create(preference);
+
+    res.json({
+      init_point: response.body.init_point,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error al crear preferencia");
   }
 });
 export const config = {
