@@ -5,7 +5,7 @@ import { ObjectId } from "mongodb";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
-import mercadopago from "mercadopago"
+import { MercadoPagoConfig, Preference } from "mercadopago";
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME,
   api_key: process.env.CLOUD_API_KEY,
@@ -16,10 +16,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 console.log("CLOUDINARY_URL:", process.env.CLOUDINARY_URL);
-
-mercadopago.configure({
-  access_token:process.env.MP_ACCESS_TOKEN
+const clients = new MercadoPagoConfig({
+  accessToken: process.env.MP_ACCESS_TOKEN,
 });
+
 
 const storage = new CloudinaryStorage({
   cloudinary,
@@ -296,14 +296,19 @@ app.post("/create-preference", async (req, res) => {
       auto_return: "approved",
     };
 
-    const response = await mercadopago.preferences.create(preference);
+    const preferenceCliente=new Preference(clients) ;
+    const response=await preferenceCliente.create({body:preference})
 
     res.json({
-      init_point: response.body.init_point,
+      init_point: response.init_point,
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).send("Error al crear preferencia");
+     
+  console.error("ERROR MP:", error);
+  res.status(500).json({
+    error: error.message,
+    detail: error.response?.data || null,
+  });
   }
 });
 export const config = {
