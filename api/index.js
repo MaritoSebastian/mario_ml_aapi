@@ -20,7 +20,6 @@ const clients = new MercadoPagoConfig({
   accessToken: process.env.MP_ACCESS_TOKEN,
 });
 
-
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
@@ -106,7 +105,7 @@ app.post("/api/products", async (req, res) => {
         error: "BODY_VACIO_O_INVALIDO",
       });
     }
-    if (isNaN(stock) || Number(stock)<0) {
+    if (isNaN(stock) || Number(stock) < 0) {
       return res.status(400).json({
         ok: false,
         error: "STOCK_INVALIDO",
@@ -268,53 +267,117 @@ app.delete("/api/products/:id", async (req, res) => {
 app.post("/create-preference", async (req, res) => {
   try {
     const { items } = req.body;
-    const db=await getDB();
-    const order={
-       items,
-  total: items.reduce((acc, item) => acc + item.price * item.quantity, 0),
-  status: "pending",
-  createdAt: new Date(),
-
-
+    const db = await getDB();
+    const order = {
+      items,
+      total: items.reduce((acc, item) => acc + item.price * item.quantity, 0),
+      status: "pending",
+      paymentId:null,
+      createdAt: new Date(),
     };
     const result = await db.collection("orders").insertOne(order);
 
     const preference = {
       items: items.map((item) => ({
-       
         title: item.title,
         unit_price: item.price,
         quantity: item.quantity,
-          currency_id: "ARS",
+        currency_id: "ARS",
       })),
-       external_reference: result.insertedId.toString(),
+      external_reference: result.insertedId.toString(),
       back_urls: {
         success: "http://localhost:5173/success",
         failure: "http://localhost:5173/error",
-         pending: "http://localhost:5173/pending",
+        pending: "http://localhost:5173/pending",
+        
       },
+      notification_url: "https://mario-ml-aapi.vercel.app/webhook",
       auto_return: "approved",
     };
 
-    const preferenceCliente=new Preference(clients) ;
-    const response=await preferenceCliente.create({body:preference})
+    const preferenceCliente = new Preference(clients);
+    const response = await preferenceCliente.create({ body: preference });
 
     res.json({
       init_point: response.init_point,
     });
   } catch (error) {
-     
-  console.error("ERROR MP:", error);
-  res.status(500).json({
-    error: error.message,
-    detail: error.response?.data || null,
-  });
+    console.error("ERROR MP:", error);
+    res.status(500).json({
+      error: error.message,
+      detail: error.response?.data || null,
+    });
   }
 });
-export const config = {
+//endpoind webhook
+app.post("/webhook", async (req, res) => {
+  try {
+    const body = req.body;
+
+    console.log("WEBHOOK RECIBIDO:", body);
+
+    if (body.type === "payment") {
+      const paymentId = body.data.id;
+
+      const paymentRes = await fetch(
+        `https://api.mercadopago.com/v1/payments/${paymentId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
+          },
+        }
+      );
+
+      const payment = await paymentRes.json();
+
+      const orderId = payment.external_reference;
+
+      if (!orderId) {
+        console.log("SIN external_reference");
+        return res.sendStatus(200);
+      }
+
+      const db = await getDB();
+
+      const existingOrder = await db.collection("orders").findOne({
+        _id: new ObjectId(orderId),
+      });
+
+      if (!existingOrder) {
+        console.log("ORDER NO EXISTE");
+        return res.sendStatus(200);
+      }
+
+      // 🔥 evitar reprocesar
+      if (existingOrder.paymentId) {
+        console.log("YA PROCESADO");
+        return res.sendStatus(200);
+      }
+
+      await db.collection("orders").updateOne(
+        { _id: existingOrder._id },
+        {
+          $set: {
+            status: payment.status,
+            paymentId: paymentId,
+          },
+        }
+      );
+
+      console.log("ORDER ACTUALIZADA:", orderId);
+    }
+
+    res.sendStatus(200);
+  } catch (error) {
+    console.error("WEBHOOK ERROR:", error);
+    res.sendStatus(500);
+  }
+});
+
+/*export const config = {
   api: {
     bodyParser: false,
   },
-};
+};*/
 
 export default app;
