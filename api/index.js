@@ -264,7 +264,7 @@ app.delete("/api/products/:id", async (req, res) => {
   }
 });
 //ENDPOINDDEMERCADOPAGO//
-app.post("/create-preference", async (req, res) => {
+app.post("/api/create-preference", async (req, res) => {
   try {
     const { items } = req.body;
     const db = await getDB();
