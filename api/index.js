@@ -12,6 +12,7 @@ cloudinary.config({
   api_secret: process.env.CLOUD_API_SECRET,
   secure: true,
 });
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -276,8 +277,9 @@ app.post("/api/create-preference", async (req, res) => {
       createdAt: new Date(),
     };
     const result = await db.collection("orders").insertOne(order);
-
+     const FRONT_URL=process.env.VERCEL_TIENDA_FRONT;
     const preference = {
+    
       items: items.map((item) => ({
         title: item.title,
         unit_price: item.price,
@@ -286,9 +288,9 @@ app.post("/api/create-preference", async (req, res) => {
       })),
       external_reference: result.insertedId.toString(),
       back_urls: {
-        success: "http://localhost:5173/success",
-        failure: "http://localhost:5173/error",
-        pending: "http://localhost:5173/pending",
+        success: `${FRONT_URL}/success`,
+        failure: `${FRONT_URL}/error`,
+        pending:`${FRONT_URL}/pending` ,
         
       },
       notification_url: "https://mario-ml-aapi.vercel.app/webhook",
