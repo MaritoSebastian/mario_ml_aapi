@@ -18,8 +18,7 @@ app.use(cors());
 app.use(express.json());
 console.log("CLOUDINARY_URL:", process.env.CLOUDINARY_URL);
 const clients = new MercadoPagoConfig({
-  accessToken: process.env.MP_ACCESS_TOKEN,
-});
+  accessToken: process.env.MP_ACCESS_TOKEN_PRUEBA});
 
 const storage = new CloudinaryStorage({
   cloudinary,
@@ -325,7 +324,7 @@ app.post("/webhook", async (req, res) => {
         `https://api.mercadopago.com/v1/payments/${paymentId}`,
         {
           headers: {
-            Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
+            Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN_PRUEBA}`,//cambio pra modo test
           },
         }
       );
