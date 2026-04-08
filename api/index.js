@@ -281,10 +281,12 @@ app.post("/api/create-preference", async (req, res) => {
     
       items: items.map((item) => ({
         title: item.title,
-        unit_price: item.price,
-        quantity: item.quantity,
+        unit_price:Number(item.price),
+        quantity:Number(item.quantity) ,
         currency_id: "ARS",
       })),
+      
+      
       external_reference: result.insertedId.toString(),
       back_urls: {
         success: `${FRONT_URL}/success`,
@@ -302,6 +304,7 @@ app.post("/api/create-preference", async (req, res) => {
     res.json({
       init_point: response.init_point,
     });
+    console.log("ITEMS MP:", items )
   } catch (error) {
     console.error("ERROR MP:", error);
     res.status(500).json({
