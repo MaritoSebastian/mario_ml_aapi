@@ -287,9 +287,9 @@ app.post("/api/create-preference", async (req, res) => {
       })),
       external_reference: result.insertedId.toString(),
       back_urls: {
-        success: `${VERCEL_TIENDA_FRONT}/success`,
-        failure: `${VERCEL_TIENDA_FRONT}/error`,
-        pending:`${VERCEL_TIENDA_FRONT}/pending` ,
+        success: `${FRONT_URL}/success`,
+        failure: `${FRONT_URL}/error`,
+        pending:`${FRONT_URL}/pending` ,
         
       },
       notification_url: "https://mario-ml-aapi.vercel.app/webhook",
