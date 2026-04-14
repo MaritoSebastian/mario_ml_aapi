@@ -285,9 +285,7 @@ app.post("/api/create-preference", async (req, res) => {
         quantity:Number(item.quantity) ,
         currency_id: "ARS",
       })),
-      payer:{
-        email:"test_user@test.com"
-      },
+   
       
       
       external_reference: result.insertedId.toString(),
