@@ -1,24 +1,60 @@
+//parche para poder probar en local//
+import dns from "dns";
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
+import dotenv from "dotenv";
+dotenv.config();
 import express from "express";
 import cors from "cors";
-import { MongoClient } from "mongodb";
-import { ObjectId } from "mongodb";
+import authRoutes from "./routes/authRoutes.js";
+import { MongoClient, ObjectId } from "mongodb";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { MercadoPagoConfig, Preference } from "mercadopago";
+let client;
+let db;
+const uri = process.env.MONGODB_URI; // ← Atlas (Vercel)
+
+async function getDB() {
+  if (db) return db; // ✅ Si ya está conectado, reutilizar
+
+  if (!client) {
+    console.log("🔄 Creando nuevo cliente MongoDB...");
+    client = new MongoClient(uri);
+  }
+
+  if (!client.topology || !client.topology.isConnected()) {
+    console.log("🔄 Conectando a MongoDB...");
+    await client.connect();
+    db = client.db();
+    console.log("✅ MongoDB conectado");
+  }
+
+  return db;
+}
+
+console.log("CLOUD:", {
+  name: process.env.CLOUD_NAME,
+  key: process.env.CLOUD_API_KEY,
+  secret: process.env.CLOUD_API_SECRET,
+});
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME,
   api_key: process.env.CLOUD_API_KEY,
   api_secret: process.env.CLOUD_API_SECRET,
   secure: true,
 });
+console.log("CLOUD_NAME:", process.env.CLOUD_NAME);
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.locals.getDB = getDB;
+app.use("/api/auth", authRoutes);
 console.log("CLOUDINARY_URL:", process.env.CLOUDINARY_URL);
 const clients = new MercadoPagoConfig({
-  accessToken: process.env.MP_ACCESS_TOKEN});
+  accessToken: process.env.MP_ACCESS_TOKEN,
+});
 
 const storage = new CloudinaryStorage({
   cloudinary,
@@ -58,18 +94,6 @@ app.post("/api/upload", (req, res) => {
     });
   });
 });
-
-let client;
-let db;
-
-async function getDB() {
-  if (db) return db;
-
-  client = new MongoClient(process.env.MONGODB_URI);
-  await client.connect();
-  db = client.db();
-  return db;
-}
 
 /* ===== HEALTH ===== */
 app.get("/health", (req, res) => {
@@ -272,28 +296,24 @@ app.post("/api/create-preference", async (req, res) => {
       items,
       total: items.reduce((acc, item) => acc + item.price * item.quantity, 0),
       status: "pending",
-      paymentId:null,
+      paymentId: null,
       createdAt: new Date(),
     };
     const result = await db.collection("orders").insertOne(order);
-     const FRONT_URL=process.env.VERCEL_TIENDA_FRONT;
+    const FRONT_URL = process.env.VERCEL_TIENDA_FRONT;
     const preference = {
-    
       items: items.map((item) => ({
         title: item.title,
-        unit_price:Number(item.price),
-        quantity:Number(item.quantity) ,
+        unit_price: Number(item.price),
+        quantity: Number(item.quantity),
         currency_id: "ARS",
       })),
-   
-      
-      
+
       external_reference: result.insertedId.toString(),
       back_urls: {
         success: `${FRONT_URL}/success`,
         failure: `${FRONT_URL}/error`,
-        pending:`${FRONT_URL}/pending` ,
-        
+        pending: `${FRONT_URL}/pending`,
       },
       notification_url: "https://mario-ml-aapi.vercel.app/webhook",
       auto_return: "approved",
@@ -305,7 +325,7 @@ app.post("/api/create-preference", async (req, res) => {
     res.json({
       init_point: response.init_point,
     });
-    console.log("ITEMS MP:", items )
+    console.log("ITEMS MP:", items);
   } catch (error) {
     console.error("ERROR MP:", error);
     res.status(500).json({
@@ -328,9 +348,9 @@ app.post("/webhook", async (req, res) => {
         `https://api.mercadopago.com/v1/payments/${paymentId}`,
         {
           headers: {
-            Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,//cambio pra modo test
+            Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`, //cambio pra modo test
           },
-        }
+        },
       );
 
       const payment = await paymentRes.json();
@@ -366,7 +386,7 @@ app.post("/webhook", async (req, res) => {
             status: payment.status,
             paymentId: paymentId,
           },
-        }
+        },
       );
 
       console.log("ORDER ACTUALIZADA:", orderId);
@@ -379,10 +399,10 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-/*export const config = {
-  api: {
-    bodyParser: false,
-  },
-};*/
+const PORT = 5000;
+
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en puerto ${PORT}`);
+});
 
 export default app;
