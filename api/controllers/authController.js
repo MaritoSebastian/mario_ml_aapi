@@ -1,15 +1,14 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-
 export const register = async (req, res) => {
   console.log("ENTRÓ AL REGISTER");
   try {
     const db = await req.app.locals.getDB();
 
-    const { email, password } = req.body;
+    const { name, email, password } = req.body;
 
     // 1. validar datos
-    if (!email || !password) {
+    if (!name || !email || !password) {
       return res.status(400).json({ error: "DATOS_INCOMPLETOS" });
     }
 
@@ -22,23 +21,51 @@ export const register = async (req, res) => {
 
     // 3. encriptar password
     const hashedPassword = await bcrypt.hash(password, 10);
+    //definir el rol
+    const adminEmails = process.env.ADMIN_EMAILS
+      ? process.env.ADMIN_EMAILS.split(",")
+      : [];
+    const role = adminEmails.includes(email) ? "admin" : "user";
 
     // 4. crear usuario
     const newUser = {
+      name,
       email,
       password: hashedPassword,
-      role: "user", // por defecto
+      role: role,
       createdAt: new Date(),
     };
 
-    await db.collection("users").insertOne(newUser);
+    const result = await db.collection("users").insertOne(newUser);
 
-    res.json({ ok: true, message: "Usuario creado" });
+    // 5. GENERAR TOKEN (igual que en login)
+    const token = jwt.sign(
+      {
+        userId: result.insertedId.toString(),
+        email: email,
+        role: role,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" },
+    );
+
+    // 6. DEVOLVER RESPUESTA CON TOKEN
+    res.json({
+      ok: true,
+      message: "Usuario creado",
+      token,
+      user: {
+        name: name,
+        email: email,
+        role: role,
+      },
+    });
   } catch (error) {
     console.error("REGISTER ERROR:", error);
     res.status(500).json({ error: error.message });
   }
 };
+
 //===LOGIN===//
 export const login = async (req, res) => {
   console.log("entro al login");
@@ -63,7 +90,7 @@ export const login = async (req, res) => {
       { expiresIn: "7d" },
     );
     res.json({
-      ok:true,
+      ok: true,
       token,
       user: {
         email: user.email,
