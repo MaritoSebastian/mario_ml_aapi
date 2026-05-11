@@ -103,3 +103,31 @@ export const login = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+//GETME
+
+export const getMe = async (req, res) => {
+  try {
+    const db = await req.app.locals.getDB();
+    
+    const user = await db.collection("users").findOne(
+      { email: req.user.email },
+      { projection: { password: 0 } } // No enviamos el password
+    );
+    
+    if (!user) {
+      return res.status(404).json({ error: "USUARIO_NO_ENCONTRADO" });
+    }
+    
+    res.json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error("GET_ME ERROR:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
