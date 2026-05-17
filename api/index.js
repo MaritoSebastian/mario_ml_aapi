@@ -32,6 +32,32 @@ async function getDB() {
 
   return db;
 }
+// En index.js, después de la función getDB()
+// Agregar esta función:
+
+async function setupPasswordResetsCollection() {
+  try {
+    const db = await getDB();
+
+    const collection = db.collection("password_resets");
+
+    // Índice TTL para borrar automáticamente documentos expirados
+    await collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+    // Índice compuesto para búsquedas rápidas
+    await collection.createIndex({ email: 1, code: 1 });
+
+    // Índice para limpiar códigos viejos no usados
+    await collection.createIndex(
+      { createdAt: 1 },
+      { expireAfterSeconds: 86400 }, // Borrar después de 24h si algo falló
+    );
+
+    console.log("✅ Colección password_resets configurada con índices");
+  } catch (error) {
+    console.error("❌ Error configurando password_resets:", error);
+  }
+}
 
 console.log("CLOUD:", {
   name: process.env.CLOUD_NAME,
@@ -398,6 +424,8 @@ app.post("/webhook", async (req, res) => {
     res.sendStatus(500);
   }
 });
+
+setupPasswordResetsCollection().catch(console.error);
 
 const PORT = 5000;
 
