@@ -1,4 +1,3 @@
-//parche para poder probar en local//
 import dns from "dns";
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
 import dotenv from "dotenv";
@@ -6,59 +5,21 @@ dotenv.config();
 import express from "express";
 import cors from "cors";
 import authRoutes from "./routes/authRoutes.js";
+import dolarRoutes from "./routes/dolarRoutes.js";  // ← corregido: una L
+import productsRoutes from "./routes/productsRoutes.js";
 import { MongoClient, ObjectId } from "mongodb";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { MercadoPagoConfig, Preference } from "mercadopago";
+import { setDB as setDolarDB } from "./controllers/dolarController.js";
+import { setDB as setProductsDB } from "./controllers/productController.js";
+
 let client;
 let db;
-const uri = process.env.MONGODB_URI; // ← Atlas (Vercel)
+const uri = process.env.MONGODB_URI;
 
-async function getDB() {
-  if (db) return db; // ✅ Si ya está conectado, reutilizar
-
-  if (!client) {
-    console.log("🔄 Creando nuevo cliente MongoDB...");
-    client = new MongoClient(uri);
-  }
-
-  if (!client.topology || !client.topology.isConnected()) {
-    console.log("🔄 Conectando a MongoDB...");
-    await client.connect();
-    db = client.db();
-    console.log("✅ MongoDB conectado");
-  }
-
-  return db;
-}
-// En index.js, después de la función getDB()
-// Agregar esta función:
-
-async function setupPasswordResetsCollection() {
-  try {
-    const db = await getDB();
-
-    const collection = db.collection("password_resets");
-
-    // Índice TTL para borrar automáticamente documentos expirados
-    await collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-
-    // Índice compuesto para búsquedas rápidas
-    await collection.createIndex({ email: 1, code: 1 });
-
-    // Índice para limpiar códigos viejos no usados
-    await collection.createIndex(
-      { createdAt: 1 },
-      { expireAfterSeconds: 86400 }, // Borrar después de 24h si algo falló
-    );
-
-    console.log("✅ Colección password_resets configurada con índices");
-  } catch (error) {
-    console.error("❌ Error configurando password_resets:", error);
-  }
-}
-
+// ===== PRIMERO: Configurar Cloudinary =====
 console.log("CLOUD:", {
   name: process.env.CLOUD_NAME,
   key: process.env.CLOUD_API_KEY,
@@ -70,14 +31,42 @@ cloudinary.config({
   api_secret: process.env.CLOUD_API_SECRET,
   secure: true,
 });
-console.log("CLOUD_NAME:", process.env.CLOUD_NAME);
 
+// ===== SEGUNDO: Crear app =====
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// ===== TERCERO: Función getDB =====
+async function getDB() {
+  if (db) return db;
+  if (!client) {
+    console.log("🔄 Creando nuevo cliente MongoDB...");
+    client = new MongoClient(uri);
+  }
+  if (!client.topology || !client.topology.isConnected()) {
+    console.log("🔄 Conectando a MongoDB...");
+    await client.connect();
+    db = client.db();
+    console.log("✅ MongoDB conectado");
+  }
+  return db;
+}
+
 app.locals.getDB = getDB;
+
+// ===== CUARTO: Configurar controllers con DB =====
+setProductsDB(getDB);
+setDolarDB(getDB);
+
+// ===== QUINTO: Rutas =====
 app.use("/api/auth", authRoutes);
+app.use("/api/products", productsRoutes);
+app.use("/api/dolar", dolarRoutes);
+
+// ===== RESTO DE ENDPOINTS (upload, ML, MP, etc) =====
 console.log("CLOUDINARY_URL:", process.env.CLOUDINARY_URL);
+
 const clients = new MercadoPagoConfig({
   accessToken: process.env.MP_ACCESS_TOKEN,
 });
@@ -91,6 +80,7 @@ const storage = new CloudinaryStorage({
 });
 
 const upload = multer({ storage });
+
 app.post("/api/upload", (req, res) => {
   upload.single("image")(req, res, function (err) {
     if (err) {
@@ -100,20 +90,17 @@ app.post("/api/upload", (req, res) => {
         error: err.message,
       });
     }
-
     if (!req.file) {
       return res.status(400).json({
         ok: false,
         error: "NO_FILE_RECEIVED",
       });
     }
-
     console.log("FILE OK:", req.file.path);
     const optimizedUrl = req.file.path.replace(
       "/upload/",
       "/upload/f_auto,q_auto,w_800/",
     );
-
     res.json({
       ok: true,
       imageUrl: optimizedUrl,
@@ -136,79 +123,13 @@ app.get("/api/ml/status", async (req, res) => {
   });
 });
 
-/* =====GUARDAR  ===== */
-app.post("/api/products", async (req, res) => {
-  try {
-    const { title, price, stock, category, images, description } = req.body;
-
-    if (
-      !title ||
-      price === undefined ||
-      stock === undefined ||
-      !category ||
-      !description ||
-      !Array.isArray(images) ||
-      images.length === 0
-    ) {
-      return res.status(400).json({
-        ok: false,
-        error: "BODY_VACIO_O_INVALIDO",
-      });
-    }
-    if (isNaN(stock) || Number(stock) < 0) {
-      return res.status(400).json({
-        ok: false,
-        error: "STOCK_INVALIDO",
-      });
-    }
-    if (isNaN(price) || Number(price) <= 0) {
-      return res.status(400).json({
-        ok: false,
-        error: "PRICE_INVALIDO",
-      });
-    }
-
-    const db = await getDB();
-
-    const product = {
-      title,
-      price: Number(price),
-      stock: Number(stock),
-      category,
-      images: images || [],
-      description,
-      ml: {
-        published: false,
-        item_id: null,
-      },
-      createdAt: new Date(),
-    };
-
-    const result = await db.collection("products").insertOne(product);
-
-    res.json({
-      ok: true,
-      message: "Producto guardado",
-      productId: result.insertedId,
-    });
-  } catch (error) {
-    console.error("ERROR PRODUCTS:", error);
-    res.status(500).json({
-      ok: false,
-      error: error.message,
-    });
-  }
-});
-
 /* ===== PUBLICAR ===== */
 app.post("/api/ml/item", async (req, res) => {
   const db = await getDB();
   const token = await db.collection("tokens_ml").findOne({});
-
   if (!token) {
     return res.status(401).json({ error: "NO_CONECTADO_ML" });
   }
-
   const mlRes = await fetch("https://api.mercadolibre.com/items", {
     method: "POST",
     headers: {
@@ -217,28 +138,23 @@ app.post("/api/ml/item", async (req, res) => {
     },
     body: JSON.stringify(req.body),
   });
-
   const data = await mlRes.json();
   res.status(mlRes.status).json(data);
 });
 
-//====PPUBLICAR USANDO MONGO====//
+//==== PUBLICAR USANDO MONGO ====//
 app.post("/api/ml/publish/:id", async (req, res) => {
   const db = await getDB();
   const token = await db.collection("tokens_ml").findOne({});
-
   if (!token) {
     return res.status(401).json({ error: "NO_CONECTADO_ML" });
   }
-
   const product = await db.collection("products").findOne({
     _id: new ObjectId(req.params.id),
   });
-
   if (!product) {
     return res.status(404).json({ error: "PRODUCTO_NO_EXISTE" });
   }
-
   const mlRes = await fetch("https://api.mercadolibre.com/items", {
     method: "POST",
     headers: {
@@ -256,9 +172,7 @@ app.post("/api/ml/publish/:id", async (req, res) => {
       },
     }),
   });
-
   const data = await mlRes.json();
-
   if (mlRes.ok) {
     await db.collection("products").updateOne(
       { _id: product._id },
@@ -270,50 +184,10 @@ app.post("/api/ml/publish/:id", async (req, res) => {
       },
     );
   }
-
   res.status(mlRes.status).json(data);
 });
 
-//====LISTAR PROIDUCTOS===//
-app.get("/api/products", async (req, res) => {
-  const db = await getDB();
-  const products = await db
-    .collection("products")
-    .find()
-    .sort({ createdAt: -1 })
-    .toArray();
-
-  res.json(products);
-});
-//====ELIMINAR PRODUCTO====//
-app.delete("/api/products/:id", async (req, res) => {
-  try {
-    const db = await getDB();
-    const { id } = req.params;
-
-    const result = await db.collection("products").deleteOne({
-      _id: new ObjectId(id),
-    });
-
-    if (result.deletedCount === 0) {
-      return res.status(404).json({
-        ok: false,
-        error: "PRODUCTO_NO_ENCONTRADO",
-      });
-    }
-
-    res.json({
-      ok: true,
-      message: "Producto eliminado",
-    });
-  } catch (error) {
-    res.status(500).json({
-      ok: false,
-      error: error.message,
-    });
-  }
-});
-//ENDPOINDDEMERCADOPAGO//
+//==== ENDPOINT MERCADO PAGO ====//
 app.post("/api/create-preference", async (req, res) => {
   try {
     const { items } = req.body;
@@ -334,7 +208,6 @@ app.post("/api/create-preference", async (req, res) => {
         quantity: Number(item.quantity),
         currency_id: "ARS",
       })),
-
       external_reference: result.insertedId.toString(),
       back_urls: {
         success: `${FRONT_URL}/success`,
@@ -344,10 +217,8 @@ app.post("/api/create-preference", async (req, res) => {
       notification_url: "https://mario-ml-aapi.vercel.app/webhook",
       auto_return: "approved",
     };
-
     const preferenceCliente = new Preference(clients);
     const response = await preferenceCliente.create({ body: preference });
-
     res.json({
       init_point: response.init_point,
     });
@@ -360,51 +231,40 @@ app.post("/api/create-preference", async (req, res) => {
     });
   }
 });
-//endpoind webhook
+
+//==== WEBHOOK ====//
 app.post("/webhook", async (req, res) => {
   try {
     const body = req.body;
-
     console.log("WEBHOOK RECIBIDO:", body);
-
     if (body.type === "payment") {
       const paymentId = body.data.id;
-
       const paymentRes = await fetch(
         `https://api.mercadopago.com/v1/payments/${paymentId}`,
         {
           headers: {
-            Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`, //cambio pra modo test
+            Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
           },
         },
       );
-
       const payment = await paymentRes.json();
-
       const orderId = payment.external_reference;
-
       if (!orderId) {
         console.log("SIN external_reference");
         return res.sendStatus(200);
       }
-
       const db = await getDB();
-
       const existingOrder = await db.collection("orders").findOne({
         _id: new ObjectId(orderId),
       });
-
       if (!existingOrder) {
         console.log("ORDER NO EXISTE");
         return res.sendStatus(200);
       }
-
-      // 🔥 evitar reprocesar
       if (existingOrder.paymentId) {
         console.log("YA PROCESADO");
         return res.sendStatus(200);
       }
-
       await db.collection("orders").updateOne(
         { _id: existingOrder._id },
         {
@@ -414,10 +274,8 @@ app.post("/webhook", async (req, res) => {
           },
         },
       );
-
       console.log("ORDER ACTUALIZADA:", orderId);
     }
-
     res.sendStatus(200);
   } catch (error) {
     console.error("WEBHOOK ERROR:", error);
@@ -425,10 +283,27 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
+//==== SETUP PASSWORD RESETS ====//
+async function setupPasswordResetsCollection() {
+  try {
+    const db = await getDB();
+    const collection = db.collection("password_resets");
+    await collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+    await collection.createIndex({ email: 1, code: 1 });
+    await collection.createIndex(
+      { createdAt: 1 },
+      { expireAfterSeconds: 86400 },
+    );
+    console.log("✅ Colección password_resets configurada con índices");
+  } catch (error) {
+    console.error("❌ Error configurando password_resets:", error);
+  }
+}
+
 setupPasswordResetsCollection().catch(console.error);
 
+//==== INICIAR SERVIDOR ====//
 const PORT = 5000;
-
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
 });
