@@ -5,7 +5,7 @@ dotenv.config();
 import express from "express";
 import cors from "cors";
 import authRoutes from "./routes/authRoutes.js";
-import dolarRoutes from "./routes/dolarRoutes.js";  // ← corregido: una L
+import dolarRoutes from "./routes/dolarRoutes.js"; 
 import productsRoutes from "./routes/productsRoutes.js";
 import { MongoClient, ObjectId } from "mongodb";
 import { v2 as cloudinary } from "cloudinary";
