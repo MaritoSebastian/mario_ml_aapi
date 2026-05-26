@@ -30,23 +30,53 @@ export const getDolar = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+// dolarController.js
+
+// Helper: actualiza productos ARS solo si el nuevo dólar es mayor
+async function updateProductPricesIfHigher(db, newDolar) {
+  if (!newDolar || isNaN(newDolar) || newDolar <= 0) return 0;
+
+  const productsToUpdate = await db.collection("products").find({
+    price: { $ne: null, $exists: true },
+    dolar_reference: { $ne: null, $exists: true }
+  }).toArray();
+
+  let updatedCount = 0;
+  for (const product of productsToUpdate) {
+    if (newDolar > product.dolar_reference) {
+      const priceInUSD = product.price / product.dolar_reference;
+      const newPrice = Math.ceil(priceInUSD * newDolar);
+      await db.collection("products").updateOne(
+        { _id: product._id },
+        {
+          $set: {
+            price: newPrice,
+            last_price_update: new Date(),
+            dolar_reference: newDolar
+          }
+        }
+      );
+      updatedCount++;
+    }
+  }
+  return updatedCount;
+}
+
+// Luego vienen getDolar, updateDolarManual, etc.
 
 // POST /api/dolar - Admin actualiza manualmente
 export const updateDolarManual = async (req, res) => {
   try {
     const { dolar } = req.body;
-
     if (!dolar || isNaN(dolar) || dolar <= 0) {
       return res.status(400).json({ error: "DOLAR_INVALIDO" });
     }
 
     const db = await getDB();
-    
-    // Obtener el dólar anterior antes de actualizar
     const oldConfig = await db.collection("config").findOne({ key: "dolar" });
     const oldDolar = oldConfig?.value || null;
-    
-    // Actualizar el dólar
+
+    // Actualizar el dólar en configuración
     await db.collection("config").updateOne(
       { key: "dolar" },
       {
@@ -59,43 +89,16 @@ export const updateDolarManual = async (req, res) => {
       { upsert: true }
     );
 
-    // 🔴 NUEVO: Si el nuevo dólar es mayor, actualizar precios de productos
+    // Actualizar precios si el nuevo es mayor
     let updatedCount = 0;
     if (oldDolar && Number(dolar) > oldDolar) {
-      // Llamar a la función de actualización de precios
-      const productsToUpdate = await db.collection("products").find({
-        price: { $ne: null, $exists: true },
-        dolar_reference: { $ne: null, $exists: true }
-      }).toArray();
-
-      
-      
-      for (const product of productsToUpdate) {
-        if (Number(dolar) > product.dolar_reference) {
-          const priceInUSD = product.price / product.dolar_reference;
-          const newPrice = Math.ceil(priceInUSD * Number(dolar));
-          
-          await db.collection("products").updateOne(
-            { _id: product._id },
-            { 
-              $set: { 
-                price: newPrice,
-                last_price_update: new Date(),
-                dolar_reference: Number(dolar)
-              } 
-            }
-          );
-          updatedCount++;
-        }
-      }
-      
-      console.log(`Precios actualizados: ${updatedCount} productos`);
+      updatedCount = await updateProductPricesIfHigher(db, Number(dolar));
     }
 
-    res.json({ 
-      ok: true, 
+    res.json({
+      ok: true,
       dolar: Number(dolar),
-      productsUpdated: updatedCount || 0
+      productsUpdated: updatedCount
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -105,9 +108,7 @@ export const updateDolarManual = async (req, res) => {
 // POST /api/dolar/auto - Obtener de Binance
 export const updateDolarAuto = async (req, res) => {
   try {
-    const response = await fetch(
-      "https://api.binance.com/api/v3/ticker/price?symbol=USDTARS"
-    );
+    const response = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=USDTARS");
     const data = await response.json();
     const dolarBinance = parseFloat(data.price);
 
@@ -119,10 +120,11 @@ export const updateDolarAuto = async (req, res) => {
       new Date() - new Date(config.ultima_actualizacion) < 24 * 60 * 60 * 1000;
 
     let updatedCount = 0;
-    
+    let actualizado = false;
+
     if (!hayManualReciente) {
       const oldDolar = config?.value || null;
-      
+
       await db.collection("config").updateOne(
         { key: "dolar" },
         {
@@ -134,39 +136,17 @@ export const updateDolarAuto = async (req, res) => {
         },
         { upsert: true }
       );
-      
-      // 🔴 NUEVO: Si el nuevo dólar es mayor, actualizar precios
-      if (oldDolar && dolarBinance > oldDolar) {
-        const productsToUpdate = await db.collection("products").find({
-          price: { $ne: null, $exists: true },
-          dolar_reference: { $ne: null, $exists: true }
-        }).toArray();
 
-        for (const product of productsToUpdate) {
-          if (dolarBinance > product.dolar_reference) {
-            const priceInUSD = product.price / product.dolar_reference;
-            const newPrice = Math.ceil(priceInUSD * dolarBinance);
-            
-            await db.collection("products").updateOne(
-              { _id: product._id },
-              { 
-                $set: { 
-                  price: newPrice,
-                  last_price_update: new Date(),
-                  dolar_reference: dolarBinance
-                } 
-              }
-            );
-            updatedCount++;
-          }
-        }
+      if (oldDolar && dolarBinance > oldDolar) {
+        updatedCount = await updateProductPricesIfHigher(db, dolarBinance);
       }
+      actualizado = true;
     }
 
     res.json({
       ok: true,
       dolar: dolarBinance,
-      actualizado: !hayManualReciente,
+      actualizado,
       productsUpdated: updatedCount,
       mensaje: hayManualReciente
         ? "No se actualizó (hay valor manual reciente)"

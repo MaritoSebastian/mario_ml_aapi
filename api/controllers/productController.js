@@ -82,14 +82,16 @@ export const createProduct = async (req, res) => {
       finalPrice = Number(price);
       finalPriceUsd = null;
       finalShippingCost = null;
-      
+
       // 🔴 NUEVO: guardar el dólar actual al momento de crear el producto
       if (dolar_actual && !isNaN(dolar_actual) && dolar_actual > 0) {
         dolarReference = Number(dolar_actual);
       } else {
         // Si no viene dolar_actual, intentamos obtenerlo de la DB
         const db = await getDB();
-        const dolarConfig = await db.collection("config").findOne({ key: "dolar" });
+        const dolarConfig = await db
+          .collection("config")
+          .findOne({ key: "dolar" });
         if (dolarConfig) {
           dolarReference = dolarConfig.value;
         } else {
@@ -168,83 +170,23 @@ export const deleteProduct = async (req, res) => {
   }
 };
 
-// 🔴 NUEVO: Endpoint para actualizar todos los productos antiguos
-// POST /api/products/update-prices - Actualizar precios según nuevo dólar
-export const updateAllPrices = async (req, res) => {
-  try {
-    const { newDolar } = req.body;
-    
-    if (!newDolar || isNaN(newDolar) || newDolar <= 0) {
-      return res.status(400).json({
-        ok: false,
-        error: "DOLAR_INVALIDO",
-      });
-    }
-
-    const db = await getDB();
-    
-    // Obtener todos los productos con precio fijo ARS (que tienen dolar_reference)
-    const productsToUpdate = await db.collection("products").find({
-      price: { $ne: null, $exists: true },
-      dolar_reference: { $ne: null, $exists: true }
-    }).toArray();
-
-    let updatedCount = 0;
-    
-    for (const product of productsToUpdate) {
-      // Solo actualizar si el nuevo dólar es mayor al de referencia
-      if (newDolar > product.dolar_reference) {
-        // Recalcular precio: (precio original / dolar_reference) * nuevo dolar
-        const priceInUSD = product.price / product.dolar_reference;
-        const newPrice = Math.ceil(priceInUSD * newDolar);
-        
-        // Actualizar el producto
-        await db.collection("products").updateOne(
-          { _id: product._id },
-          { 
-            $set: { 
-              price: newPrice,
-              last_price_update: new Date(),
-              old_dolar_reference: product.dolar_reference,
-              dolar_reference: newDolar // Actualizar referencia al nuevo dólar
-            } 
-          }
-        );
-        updatedCount++;
-      }
-    }
-    
-    res.json({
-      ok: true,
-      message: `${updatedCount} productos actualizados`,
-      updatedCount
-    });
-  } catch (error) {
-    console.error("ERROR UPDATE PRICES:", error);
-    res.status(500).json({
-      ok: false,
-      error: error.message,
-    });
-  }
-};
-
 // 🔴 NUEVO: Endpoint para obtener estadísticas de productos
 export const getProductsStats = async (req, res) => {
   try {
     const db = await getDB();
-    
+
     const totalProducts = await db.collection("products").countDocuments();
     const fixedPriceProducts = await db.collection("products").countDocuments({
-      price: { $ne: null, $exists: true }
+      price: { $ne: null, $exists: true },
     });
     const usdPriceProducts = await db.collection("products").countDocuments({
-      price_usd: { $ne: null, $exists: true }
+      price_usd: { $ne: null, $exists: true },
     });
-    
+
     res.json({
       total: totalProducts,
       fixedPrice: fixedPriceProducts,
-      usdPrice: usdPriceProducts
+      usdPrice: usdPriceProducts,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
