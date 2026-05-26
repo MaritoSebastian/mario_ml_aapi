@@ -1,4 +1,3 @@
-
 let getDB;
 
 export const setDB = (dbFunction) => {
@@ -36,10 +35,13 @@ export const getDolar = async (req, res) => {
 async function updateProductPricesIfHigher(db, newDolar) {
   if (!newDolar || isNaN(newDolar) || newDolar <= 0) return 0;
 
-  const productsToUpdate = await db.collection("products").find({
-    price: { $ne: null, $exists: true },
-    dolar_reference: { $ne: null, $exists: true }
-  }).toArray();
+  const productsToUpdate = await db
+    .collection("products")
+    .find({
+      price: { $ne: null, $exists: true },
+      dolar_reference: { $ne: null, $exists: true },
+    })
+    .toArray();
 
   let updatedCount = 0;
   for (const product of productsToUpdate) {
@@ -52,9 +54,9 @@ async function updateProductPricesIfHigher(db, newDolar) {
           $set: {
             price: newPrice,
             last_price_update: new Date(),
-            dolar_reference: newDolar
-          }
-        }
+            dolar_reference: newDolar,
+          },
+        },
       );
       updatedCount++;
     }
@@ -86,7 +88,7 @@ export const updateDolarManual = async (req, res) => {
           ultima_actualizacion: new Date(),
         },
       },
-      { upsert: true }
+      { upsert: true },
     );
 
     // Actualizar precios si el nuevo es mayor
@@ -98,7 +100,7 @@ export const updateDolarManual = async (req, res) => {
     res.json({
       ok: true,
       dolar: Number(dolar),
-      productsUpdated: updatedCount
+      productsUpdated: updatedCount,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -108,7 +110,9 @@ export const updateDolarManual = async (req, res) => {
 // POST /api/dolar/auto - Obtener de Binance
 export const updateDolarAuto = async (req, res) => {
   try {
-    const response = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=USDTARS");
+    const response = await fetch(
+      "https://api.binance.com/api/v3/ticker/price?symbol=USDTARS",
+    );
     const data = await response.json();
     const dolarBinance = parseFloat(data.price);
 
@@ -134,7 +138,7 @@ export const updateDolarAuto = async (req, res) => {
             ultima_actualizacion: new Date(),
           },
         },
-        { upsert: true }
+        { upsert: true },
       );
 
       if (oldDolar && dolarBinance > oldDolar) {
@@ -153,6 +157,27 @@ export const updateDolarAuto = async (req, res) => {
         : "Actualizado desde Binance",
     });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+// POST /api/dolar/all_price - Actualizar precios sin cambiar la configuración global
+export const updateAllPrices = async (req, res) => {
+  try {
+    const { newDolar } = req.body;
+    if (!newDolar || isNaN(newDolar) || newDolar <= 0) {
+      return res.status(400).json({ error: "DOLAR_INVALIDO" });
+    }
+
+    const db = await getDB();
+    const updatedCount = await updateProductPricesIfHigher(db, Number(newDolar));
+
+    res.json({
+      ok: true,
+      message: `${updatedCount} productos actualizados`,
+      updatedCount
+    });
+  } catch (error) {
+    console.error("ERROR UPDATE ALL PRICES:", error);
     res.status(500).json({ error: error.message });
   }
 };
