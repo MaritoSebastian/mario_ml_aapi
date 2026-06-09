@@ -1,5 +1,6 @@
 // products.js (tu archivo de productos)
 import { ObjectId } from "mongodb";
+import { Await } from "react-router-dom";
 
 let getDB;
 
@@ -190,5 +191,36 @@ export const getProductsStats = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+//update
+export const updateProduct = async (req, res) => {
+  try {
+    const db = await getDB();
+    const { id } = req.params;
+
+    const result = await db.collection("products").updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: req.body,
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        ok: false,
+        error: "PRODUCTO_NO_ENCONTRADO",
+      });
+    }
+
+    res.json({
+      ok: true,
+      message: "Producto actualizado",
+    });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error.message,
+    });
   }
 };
