@@ -1,6 +1,6 @@
 // products.js (tu archivo de productos)
 import { ObjectId } from "mongodb";
-import { Await } from "react-router-dom";
+
 
 let getDB;
 
