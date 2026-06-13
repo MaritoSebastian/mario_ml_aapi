@@ -194,7 +194,7 @@ export const getProductsStats = async (req, res) => {
   }
 };
 //update
-export const updateProduct = async (req, res) => {
+/*export const updateProduct = async (req, res) => {
   try {
     const db = await getDB();
     const { id } = req.params;
@@ -217,6 +217,28 @@ export const updateProduct = async (req, res) => {
       ok: true,
       message: "Producto actualizado",
     });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error.message,
+    });
+  }
+};*/export const updateProduct = async (req, res) => {
+  try {
+    const db = await getDB();
+    const { id } = req.params;
+
+    await db.collection("products").updateOne(
+      { _id: new ObjectId(id) },
+      { $set: req.body }
+    );
+
+    const updatedProduct = await db.collection("products").findOne({
+      _id: new ObjectId(id),
+    });
+
+    return res.json(updatedProduct);
+
   } catch (error) {
     res.status(500).json({
       ok: false,
