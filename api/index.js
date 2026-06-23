@@ -14,6 +14,7 @@ import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { MercadoPagoConfig, Preference } from "mercadopago";
 import { setDB as setDolarDB } from "./controllers/dolarController.js";
 import { setDB as setProductsDB } from "./controllers/productController.js";
+import { verificarToken } from "./middlewares/authMiddleware.js";
 
 let client;
 let db;
@@ -188,7 +189,8 @@ app.post("/api/ml/publish/:id", async (req, res) => {
 });
 
 //==== ENDPOINT MERCADO PAGO ====//
-app.post("/api/create-preference", async (req, res) => {
+app.post("/api/create-preference",verificarToken, async (req, res) => {
+  console.log("USUARIO LOGUEADO:", req.user);
   try {
     const { items } = req.body;
     const db = await getDB();
