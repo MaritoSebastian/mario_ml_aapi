@@ -5,7 +5,7 @@ dotenv.config();
 import express from "express";
 import cors from "cors";
 import authRoutes from "./routes/authRoutes.js";
-import dolarRoutes from "./routes/dolarRoutes.js"; 
+import dolarRoutes from "./routes/dolarRoutes.js";
 import productsRoutes from "./routes/productsRoutes.js";
 import { MongoClient, ObjectId } from "mongodb";
 import { v2 as cloudinary } from "cloudinary";
@@ -189,7 +189,7 @@ app.post("/api/ml/publish/:id", async (req, res) => {
 });
 
 //==== ENDPOINT MERCADO PAGO ====//
-app.post("/api/create-preference",verificarToken, async (req, res) => {
+app.post("/api/create-preference", verificarToken, async (req, res) => {
   console.log("USUARIO LOGUEADO:", req.user);
   try {
     const { items } = req.body;
@@ -226,12 +226,15 @@ app.post("/api/create-preference",verificarToken, async (req, res) => {
     });
     console.log("ITEMS MP:", items);
   } catch (error) {
-    console.error("ERROR MP:", error);
-    res.status(500).json({
-      error: error.message,
-      detail: error.response?.data || null,
-    });
-  }
+  console.error("ERROR MP COMPLETO:", error);
+  console.error("MENSAJE:", error.message);
+  console.error("CAUSE:", error.cause);
+
+  res.status(500).json({
+    error: error.message,
+    detail: error.response?.data || null,
+  });
+}
 });
 
 //==== WEBHOOK ====//
@@ -281,6 +284,7 @@ app.post("/webhook", async (req, res) => {
     res.sendStatus(200);
   } catch (error) {
     console.error("WEBHOOK ERROR:", error);
+
     res.sendStatus(500);
   }
 });
