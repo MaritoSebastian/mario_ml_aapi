@@ -7,14 +7,13 @@ import cors from "cors";
 import authRoutes from "./routes/authRoutes.js";
 import dolarRoutes from "./routes/dolarRoutes.js";
 import productsRoutes from "./routes/productsRoutes.js";
+import ordersRoutes from"./routes/ordersRoutes.js"
 import { MongoClient, ObjectId } from "mongodb";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
-import { MercadoPagoConfig, Preference } from "mercadopago";
 import { setDB as setDolarDB } from "./controllers/dolarController.js";
 import { setDB as setProductsDB } from "./controllers/productController.js";
-import { verificarToken } from "./middlewares/authMiddleware.js";
 
 let client;
 let db;
@@ -64,13 +63,10 @@ setDolarDB(getDB);
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productsRoutes);
 app.use("/api/dolar", dolarRoutes);
+app.use("/api/orders/", ordersRoutes);
 
 // ===== RESTO DE ENDPOINTS (upload, ML, MP, etc) =====
 console.log("CLOUDINARY_URL:", process.env.CLOUDINARY_URL);
-
-const clients = new MercadoPagoConfig({
-  accessToken: process.env.MP_ACCESS_TOKEN,
-});
 
 const storage = new CloudinaryStorage({
   cloudinary,
@@ -186,55 +182,6 @@ app.post("/api/ml/publish/:id", async (req, res) => {
     );
   }
   res.status(mlRes.status).json(data);
-});
-
-//==== ENDPOINT MERCADO PAGO ====//
-app.post("/api/create-preference", verificarToken, async (req, res) => {
-  console.log("USUARIO LOGUEADO:", req.user);
-  try {
-    const { items } = req.body;
-    const db = await getDB();
-    const order = {
-      items,
-      total: items.reduce((acc, item) => acc + item.price * item.quantity, 0),
-      status: "pending",
-      paymentId: null,
-      createdAt: new Date(),
-    };
-    const result = await db.collection("orders").insertOne(order);
-    const FRONT_URL = process.env.VERCEL_TIENDA_FRONT;
-    const preference = {
-      items: items.map((item) => ({
-        title: item.title,
-        unit_price: Number(item.price),
-        quantity: Number(item.quantity),
-        currency_id: "ARS",
-      })),
-      external_reference: result.insertedId.toString(),
-      back_urls: {
-        success: `${FRONT_URL}/success`,
-        failure: `${FRONT_URL}/error`,
-        pending: `${FRONT_URL}/pending`,
-      },
-      notification_url: "https://mario-ml-aapi.vercel.app/webhook",
-      auto_return: "approved",
-    };
-    const preferenceCliente = new Preference(clients);
-    const response = await preferenceCliente.create({ body: preference });
-    res.json({
-      init_point: response.init_point,
-    });
-    console.log("ITEMS MP:", items);
-  } catch (error) {
-  console.error("ERROR MP COMPLETO:", error);
-  console.error("MENSAJE:", error.message);
-  console.error("CAUSE:", error.cause);
-
-  res.status(500).json({
-    error: error.message,
-    detail: error.response?.data || null,
-  });
-}
 });
 
 //==== WEBHOOK ====//
