@@ -17,13 +17,17 @@ export const createPreference = async (req, res) => {
   console.log("USUARIO LOGUEADO:", req.user);
 
   try {
-    const { items } = req.body;
+    const { items,name,adress,email, whatsapp } = req.body;
 
     const db = await req.app.locals.getDB();
 
     const order = {
       userId: req.user.userId,
       items,
+      name,
+      adress,
+      email,
+      whatsapp,
       total: items.reduce(
         (acc, item) => acc + Number(item.price) * Number(item.quantity),
         0
