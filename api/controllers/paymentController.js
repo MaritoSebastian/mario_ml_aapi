@@ -76,6 +76,7 @@ export const createPreference = async (req, res) => {
 
     res.json({
       init_point: response.init_point,
+        orderId: result.insertedId.toString(),
     });
 
   } catch (error) {
