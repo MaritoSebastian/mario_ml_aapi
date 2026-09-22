@@ -1,5 +1,5 @@
 import express, { Router } from "express";
-import { getMe, register,login } from "../controllers/authController.js";
+import { getMe, register,login,updateProfile } from "../controllers/authController.js";
 import { verificarToken } from "../middlewares/authMiddleware.js";
 import { solicitarReset,verificarCodigo,resetearPassword } from "../controllers/passwordResetController.js";
 import { getDolar,updateDolarAuto,updateDolarManual } from "../controllers/dolarController.js";
@@ -16,6 +16,7 @@ router.get("/me",verificarToken,getMe);
 router.post("/solicitar-reset",solicitarReset);
 router.post("/verificar-codigo",verificarCodigo);
 router.post("/resetear-password",resetearPassword);
+router.put("/profile", verificarToken, updateProfile);
 
 
 export default router;
