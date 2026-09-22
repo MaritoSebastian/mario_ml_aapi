@@ -1,5 +1,6 @@
 import { Preference, MercadoPagoConfig } from "mercadopago";
 import dotenv from "dotenv";
+import { ObjectId } from "mongodb";
 dotenv.config();
 
 const clients = new MercadoPagoConfig({
@@ -85,6 +86,34 @@ export const createPreference = async (req, res) => {
     res.status(500).json({
       error: error.message,
       detail: error.response?.data || null,
+    });
+  }
+
+  
+};
+export const getOrderById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const db = await req.app.locals.getDB();
+
+    const order = await db.collection("orders").findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        error: "Orden no encontrada",
+      });
+    }
+
+    res.json(order);
+
+  } catch (error) {
+    console.error("ERROR AL OBTENER ORDEN:", error);
+
+    res.status(500).json({
+      error: error.message,
     });
   }
 };

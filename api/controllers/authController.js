@@ -1,11 +1,12 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { ObjectId } from "mongodb";
 export const register = async (req, res) => {
   console.log("ENTRÓ AL REGISTER");
   try {
     const db = await req.app.locals.getDB();
 
-    const { name, email, password } = req.body;
+    const { name, email, password, whatsapp, adress } = req.body;
 
     // 1. validar datos
     if (!name || !email || !password) {
@@ -31,6 +32,8 @@ export const register = async (req, res) => {
     const newUser = {
       name,
       email,
+      whatsapp: whatsapp || "",
+      adress: adress || "",
       password: hashedPassword,
       role: role,
       createdAt: new Date(),
@@ -96,6 +99,8 @@ export const login = async (req, res) => {
         email: user.email,
         name: user.name || "",
         role: user.role,
+        whatsapp: user.whatsapp || "",
+        adress: user.adress || "",
       },
     });
   } catch (error) {
@@ -108,26 +113,70 @@ export const login = async (req, res) => {
 export const getMe = async (req, res) => {
   try {
     const db = await req.app.locals.getDB();
-    
+
     const user = await db.collection("users").findOne(
       { email: req.user.email },
-      { projection: { password: 0 } } // No enviamos el password
+      { projection: { password: 0 } }, // No enviamos el password
     );
-    
+
     if (!user) {
       return res.status(404).json({ error: "USUARIO_NO_ENCONTRADO" });
     }
-    
+
     res.json({
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
-      }
+        role: user.role,
+        whatsapp: user.whatsapp || "",
+        adress: user.adress || "",
+      },
     });
   } catch (error) {
     console.error("GET_ME ERROR:", error);
     res.status(500).json({ error: error.message });
+  }
+};
+//acualizacion de perfil
+export const updateProfile = async (req, res) => {
+  try {
+    const db = await req.app.locals.getDB();
+
+    const { name, whatsapp, adress } = req.body;
+
+    if (!name || !whatsapp || !adress) {
+      return res.status(400).json({
+        error: "DATOS_INCOMPLETOS",
+      });
+    }
+
+    const result = await db.collection("users").updateOne(
+      { _id: new ObjectId(req.user.userId) },
+      {
+        $set: {
+          name,
+          whatsapp,
+          adress,
+        },
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        error: "USUARIO_NO_ENCONTRADO",
+      });
+    }
+
+    res.json({
+      ok: true,
+      message: "PERFIL_ACTUALIZADO",
+    });
+  } catch (error) {
+    console.error("UPDATE_PROFILE_ERROR:", error);
+
+    res.status(500).json({
+      error: error.message,
+    });
   }
 };
