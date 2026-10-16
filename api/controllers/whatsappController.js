@@ -23,6 +23,7 @@ export const recibirWebhook = (req, res) => {
 
   return res.status(200).send("EVENT_RECEIVED");
 };
+
 export const enviarComprobante = async (req, res) => {
   try {
     const { orderId } = req.body;
@@ -34,7 +35,6 @@ export const enviarComprobante = async (req, res) => {
     }
 
     const db = await req.app.locals.getDB();
-
     const { ObjectId } = await import("mongodb");
 
     if (!ObjectId.isValid(orderId)) {
@@ -76,15 +76,32 @@ export const enviarComprobante = async (req, res) => {
 
     const telefono = String(order.whatsapp).replace(/\D/g, "");
 
-    const mensaje = [
-      `Hola ${order.name || ""}, recibimos tu pedido de Tienda Paraguay.`,
-      `Número de orden: ${order._id}`,
-      `Total: $${order.total} ARS`,
-      "Gracias por tu compra.",
-    ].join("\n");
+    const fecha = order.createdAt
+      ? new Date(order.createdAt).toLocaleDateString("es-AR", {
+          timeZone: "America/Argentina/Tucuman",
+        })
+      : "No disponible";
+
+    const numeroOrden = String(order._id);
+    const pago = String(order.paymentId || "No disponible");
+    const nombre = String(order.name || "Cliente");
+    const email = String(order.email || "No disponible");
+    const direccion = String(order.adress || "No disponible");
+
+    const productos = (order.items || [])
+      .map((item) => {
+        const cantidad = Number(item.quantity || 1);
+        const precio = Number(item.price || 0);
+        const subtotal = precio * cantidad;
+
+        return `${item.title || "Producto"} x ${cantidad} - Unitario: $${precio} - Subtotal: $${subtotal}`;
+      })
+      .join("; ");
+
+    const total = String(order.total ?? 0);
 
     const respuesta = await fetch(
-      `https://graph.facebook.com/v23.0/${phoneNumberId}/messages`,
+      `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`,
       {
         method: "POST",
         headers: {
@@ -93,26 +110,50 @@ export const enviarComprobante = async (req, res) => {
         },
         body: JSON.stringify({
           messaging_product: "whatsapp",
-          recipient_type: "individual",
           to: telefono,
-          type: "text",
-          text: { body: mensaje },
+          type: "template",
+          template: {
+            name: "confirmacion_de_pago",
+            language: { code: "es" },
+            components: [
+              {
+                type: "body",
+                parameters: [
+                  { type: "text", text: numeroOrden },
+                  { type: "text", text: fecha },
+                  { type: "text", text: pago },
+                  { type: "text", text: nombre },
+                  { type: "text", text: email },
+                  { type: "text", text: direccion },
+                  { type: "text", text: productos || "Sin detalle" },
+                  { type: "text", text: total },
+                ],
+              },
+            ],
+          },
         }),
       }
     );
 
     const resultado = await respuesta.json();
 
+    console.log(
+      "RESPUESTA DE META:",
+      JSON.stringify(resultado, null, 2)
+    );
+
     if (!respuesta.ok) {
       console.error("ERROR AL ENVIAR WHATSAPP:", resultado);
 
       return res.status(502).json({
         error: "WhatsApp no pudo enviar el mensaje",
+        detalle: resultado,
       });
     }
 
     return res.status(200).json({
       mensaje: "Comprobante enviado por WhatsApp",
+      messageId: resultado.messages?.[0]?.id,
     });
   } catch (error) {
     console.error("ERROR ENVIANDO COMPROBANTE:", error);
