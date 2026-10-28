@@ -9,6 +9,7 @@ import dolarRoutes from "./routes/dolarRoutes.js";
 import productsRoutes from "./routes/productsRoutes.js";
 import ordersRoutes from"./routes/ordersRoutes.js"
 import whatsappRoutes from "./routes/whatsappRoutes.js";
+import logisticaRoutes from "./routes/logisticaRoutes.js";
 import { MongoClient, ObjectId } from "mongodb";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
@@ -66,6 +67,7 @@ app.use("/api/products", productsRoutes);
 app.use("/api/dolar", dolarRoutes);
 app.use("/api/orders/", ordersRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
+app.use("/api/logistica",logisticaRoutes)
 
 // ===== RESTO DE ENDPOINTS (upload, ML, MP, etc) =====
 console.log("CLOUDINARY_URL:", process.env.CLOUDINARY_URL);
